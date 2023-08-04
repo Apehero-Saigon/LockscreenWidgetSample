@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">SampleLockscreenWidget</string>
+    <string name="widget_title">This is an activity that mimics lockscreen!</string>
+    <string name="schedule_notification">Schedule notification</string>
+</resources>
