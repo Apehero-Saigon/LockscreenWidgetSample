@@ -31,6 +31,7 @@ private fun showOnLockscreen() {
 ```
 
 - To make the activity looks like lockscreen, we have to put some attributes into activity's theme:
+
 ```xml
 
 <style name="FullscreenReminderTheme" parent="Theme.AppCompat.NoActionBar">
@@ -43,18 +44,15 @@ private fun showOnLockscreen() {
 ```
 
 - And we also want to exclude the Activity from recent applications. Put these into Activity's manifest:
+
 ```xml
-<activity
-    android:name=".LockscreenWidgetActivity"
-    android:exported="false"
-    android:excludeFromRecents="true"
-    android:launchMode="singleInstance"
-    android:noHistory="true"
-    android:theme="@style/FullscreenReminderTheme"
-/>
+
+<activity android:name=".LockscreenWidgetActivity" android:exported="false" android:excludeFromRecents="true" android:launchMode="singleInstance"
+    android:noHistory="true" android:theme="@style/FullscreenReminderTheme" />
 ```
 
 - Now let's build the notification and put the intent to launch activity into it
+
 ```kotlin
 fun sendLockscreenWidgetNotification(context: Context) {
     val fullScreenIntent = Intent(context, LockscreenWidgetActivity::class.java).apply {
@@ -86,7 +84,66 @@ fun sendLockscreenWidgetNotification(context: Context) {
     - If device is not in lockscreen: a notification is shown instead.
 
 ## Note:
+
 - In demo code, when the button is clicked, I set a delay of 5 seconds before the notification is fired.
 - In real situation, you should schedule to fire the notification using schedule mechanics. Currently I'm using AlarmManager.
 
-## TODO: Tutorial on how to use AlarmManager to schedule notification
+# Use AlarmManager to schedule notification
+
+## First we need some more permissions:
+
+```xml
+
+<manifest>
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+</manifest>
+```
+
+- We need SCHEDULE_EXACT_ALARM so that we can schedule with AlarmManager
+- We need RECEIVE_BOOT_COMPLETED in order to reschedule alarm after boot because all alarms will be gone if device resets.
+
+## Next, we need to schedule the alarm at the time that we want
+
+```kotlin
+private fun scheduleLockscreenWidget(context: Context, requestCode: Int, atHour: Int, atMinute: Int = 0) {
+    Log.d(TAG, "scheduleLockscreenWidget")
+    val alarmIntent = Intent(context, AlarmReceiver::class.java)
+    val pendingIntent = PendingIntent.getBroadcast(
+        context, requestCode, alarmIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+    )
+
+    // Set time to show widget
+    val currentTimeMillis = System.currentTimeMillis()
+    val calendar: Calendar = Calendar.getInstance().apply {
+        timeInMillis = currentTimeMillis
+        set(Calendar.HOUR_OF_DAY, atHour)
+        set(Calendar.MINUTE, atMinute)
+        set(Calendar.SECOND, 0)
+
+        // If current time is after set time, push set time back one day
+        if (timeInMillis <= currentTimeMillis) add(Calendar.HOUR_OF_DAY, 24)
+    }
+
+    // Schedule alarm
+    val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+    alarmManager.setRepeating(AlarmManager.RTC_WAKEUP, calendar.timeInMillis, AlarmManager.INTERVAL_DAY, pendingIntent)
+
+    Log.d(TAG, "scheduleFullscreenReminder: alarm scheduled at ${calendar.time}")
+}
+```
+Then we simple call this function in our code depends on where we want to call in
+
+## To cancel this alarm, declare a similar PendingIntent with the same Intent and request code then call cancel on it:
+```kotlin
+fun cancelLockscreenWidgets(context: Context) {
+    // Create a pending intent with the same intent and request code
+    val pendingIntent = PendingIntent.getBroadcast(
+        context, lockscreenWidgetRequestCode,
+        Intent(context, AlarmReceiver::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_NO_CREATE
+    )
+    // Cancel it with alarm manager
+    val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+    alarmManager.cancel(pendingIntent)
+}
+```
