@@ -1,5 +1,8 @@
 package com.example.samplelockscreenwidget
 
+import android.app.KeyguardManager
+import android.content.Context
+import android.content.Intent
 import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
@@ -39,17 +42,21 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.os.bundleOf
 import com.example.samplelockscreenwidget.component.DigitalClock
 
 class LockscreenWidgetActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         showOnLockscreen()
+        // Cancel notification right after activity shows up
+        AppNotificationManager.cancelNotification(this, AppNotificationManager.LockscreenWidgetNotificationId)
 
         setContent {
             LockscreenWidgetScreenContent(
                 onWidgetClick = {
                     Toast.makeText(this, "You clicked on the widget", Toast.LENGTH_SHORT).show()
+                    startMainActivityAndFinish()
                 },
                 onDismissClick = {
                     finish()
@@ -58,11 +65,32 @@ class LockscreenWidgetActivity : AppCompatActivity() {
         }
     }
 
+    private fun startMainActivityAndFinish() {
+        val intent = Intent(this, MainActivity::class.java)
+        // Set flags to clear the activity if active and start a new one
+        // Feel free to change the flags to suit your needs
+        intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK
+        // Put any arguments here
+        intent.putExtras(bundleOf())
+        finish()
+        dismissKeyguard()
+        startActivity(intent)
+    }
+
     private fun showOnLockscreen() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
         } else {
             window.addFlags(WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCREEN_ON)
+        }
+    }
+
+    // Function to prompt user to unlock the screen
+    private fun dismissKeyguard() {
+        with(getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                requestDismissKeyguard(this@LockscreenWidgetActivity, null)
+            }
         }
     }
 }

@@ -5,6 +5,33 @@ The widget we are showing on lockscreen isn't an actual widget, it's our Activit
 In order start an activity when there is no foreground component, we have to attach it to a notification by calling "setFullscreenIntent" when
 building the notification and allow the activity to show on lockscreen in the activity.
 
+## Update 18/08/2023
+- Only send notification if the device screen is off or at lockscreen.
+AppNotificationManager.kt:
+```kotlin
+val powerManager = context.getSystemService(PowerManager::class.java)
+val keyguardManager = context.getSystemService(KeyguardManager::class.java)
+
+// Only send the notification when screen if off or screen is on but in lockscreen
+if (!powerManager.isInteractive || (powerManager.isInteractive && keyguardManager.isKeyguardLocked)) {
+    // Send notification here
+}
+```
+- Cancel the notification right after the widget activity shows to avoid user seeing or clicking on the notification.
+This should be call right in onCreate of the widget activity
+```kotlin
+AppNotificationManager.cancelNotification(this, AppNotificationManager.LockscreenWidgetNotificationId)
+```
+- Add dismiss keyguard function to prompt user to unlock screen after clicking on the widget. Call this in onClick listener.
+```kotlin
+private fun dismissKeyguard() {
+    with(getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            requestDismissKeyguard(this@LockscreenWidgetActivity, null)
+        }
+    }
+}
+```
 ## Step by step:
 
 - First we need some permissions:
@@ -13,7 +40,7 @@ building the notification and allow the activity to show on lockscreen in the ac
 
 <manifest>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />~~~~
 </manifest>
 ```
 

@@ -1,6 +1,7 @@
 package com.example.samplelockscreenwidget
 
 import android.Manifest
+import android.app.KeyguardManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -9,11 +10,15 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.PowerManager
+import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 
 object AppNotificationManager {
+    private const val TAG = "AppNotificationManager"
+
     const val DefaultNotificationChannelId = "default"
     const val DefaultNotificationChannelName = "Default"
     const val DefaultNotificationChannelDesc = "Default notification channel"
@@ -52,26 +57,32 @@ object AppNotificationManager {
     }
 
     fun sendLockscreenWidgetNotification(context: Context) {
-        val fullScreenIntent = Intent(context, LockscreenWidgetActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        val powerManager = context.getSystemService(PowerManager::class.java)
+        val keyguardManager = context.getSystemService(KeyguardManager::class.java)
+
+        // Only send the notification when screen if off or screen is on but in lockscreen
+        if (!powerManager.isInteractive || (powerManager.isInteractive && keyguardManager.isKeyguardLocked)) {
+            val fullScreenIntent = Intent(context, LockscreenWidgetActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            val fullScreenPendingIntent = PendingIntent.getActivity(
+                context, 0,
+                fullScreenIntent, PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val notificationBuilder =
+                NotificationCompat.Builder(context, DefaultNotificationChannelId)
+                    .setSmallIcon(R.drawable.ic_launcher_foreground)
+                    .setContentTitle(context.getString(R.string.app_name))
+                    .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+                    .setPriority(NotificationCompat.PRIORITY_HIGH)
+                    .setCategory(NotificationCompat.CATEGORY_CALL)
+                    .setFullScreenIntent(fullScreenPendingIntent, true)
+
+            // Cancel old notification
+            cancelNotification(context, LockscreenWidgetNotificationId)
+            // Send new notification
+            sendNotification(context, LockscreenWidgetNotificationId, notificationBuilder.build())
         }
-        val fullScreenPendingIntent = PendingIntent.getActivity(
-            context, 0,
-            fullScreenIntent, PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val notificationBuilder =
-            NotificationCompat.Builder(context, DefaultNotificationChannelId)
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
-                .setContentTitle(context.getString(R.string.app_name))
-                .setStyle(NotificationCompat.DecoratedCustomViewStyle())
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setCategory(NotificationCompat.CATEGORY_CALL)
-                .setFullScreenIntent(fullScreenPendingIntent, true)
-
-        // Cancel old notification
-        cancelNotification(context, LockscreenWidgetNotificationId)
-        // Send new notification
-        sendNotification(context, LockscreenWidgetNotificationId, notificationBuilder.build())
     }
 }
